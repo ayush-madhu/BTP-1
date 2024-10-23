@@ -7,6 +7,14 @@ from PIL import Image
 import pandas as pd
 import time
 
+import subprocess
+
+try:
+    import cv2
+except ModuleNotFoundError:
+    subprocess.check_call([os.sys.executable, "-m", "pip", "install", "opencv-python-headless"])
+    import cv2
+
 # Function to process the uploaded image
 def process_image(image):
     # Create output directory if it doesn't exist
