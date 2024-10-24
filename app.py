@@ -7,6 +7,8 @@ from PIL import Image
 import pandas as pd
 import time
 import matplotlib.pyplot as plt
+from io import BytesIO
+import zipfile
 
 
 
@@ -184,6 +186,28 @@ def process_image(image):
 
 
 
+def zip_images_and_dataframe(image_folder, dataframe):
+    zip_buffer = BytesIO()  # Create a BytesIO buffer to hold the zip file data
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED) as zf:
+        # Add images from the folder to the zip file
+        for root, _, files in os.walk(image_folder):
+            for file in files:
+                file_path = os.path.join(root, file)
+                with open(file_path, 'rb') as img_file:
+                    zf.writestr(file, img_file.read())
+
+        # Convert DataFrame to Excel and add it to the zip file
+        excel_buffer = BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            dataframe.to_excel(writer, index=False)
+        excel_buffer.seek(0)  # Move the cursor to the beginning of the buffer
+        zf.writestr('table_data.xlsx', excel_buffer.getvalue())
+    
+    zip_buffer.seek(0)  # Move the cursor to the beginning of the buffer
+    return zip_buffer
+
+
+
 
 
 
@@ -296,6 +320,15 @@ if __name__ == "__main__":
             caption3 = ['L Channel', 'a Channel', 'b Channel']
             
             captions = caption1 + caption2 + caption3
+            
+            zip_data = zip_images_and_dataframe('output', df)
+
+            st.download_button(
+                label="Download Data (ZIP)",
+                data=zip_data,
+                file_name="Static Data.zip",
+                mime="application/zip"
+            )
             
             while (True):
                 # Display extracted images
@@ -426,7 +459,6 @@ if __name__ == "__main__":
                 
                 
                 # GRAPHS CODE
-                st.markdown("<h2 style='text-align: center;'>Graphs</h2>", unsafe_allow_html=True)
                 
                 files = [f.name for f in multiple_files]
                 filenames = [f.split(".")[0] for f in files]
@@ -472,12 +504,6 @@ if __name__ == "__main__":
                 plt.savefig('output/lab_plot.png')
                 
                 
-                graph1_placeholder = st.empty()
-                graph2_placeholder = st.empty()
-                
-                graph1_placeholder.image('output/bi_plot.png', caption='Browning Index Plot', use_column_width=True)
-                graph2_placeholder.image('output/lab_plot.png', caption='L*a*b* Plot' ,use_column_width=True)
-                
                 
                 
                 
@@ -491,7 +517,7 @@ if __name__ == "__main__":
                 st.markdown("<h3 style='text-align: center;'>Image Processing Steps</h3>", unsafe_allow_html=True)
                 
                 # Create placeholders for extracted and processed images
-                static_placeholder = st.empty()
+                dynamic_placeholder = st.empty()
                 
                 caption1 = ['Orginial Image', 'Greyscale Image', 'Triangular Thresholding', 'Morphological Opening', 'Morphological Closing', 'Extracted Regions']
                 caption2 = [f'ROI {i+1}' for i in range(0, len(r_lab_values))]
@@ -499,11 +525,29 @@ if __name__ == "__main__":
                 
                 captions = caption1 + caption2 + caption3
                 
+                st.markdown("<h2 style='text-align: center;'>Graphs</h2>", unsafe_allow_html=True)
+                graph1_placeholder = st.empty()
+                graph2_placeholder = st.empty()
+                
+                graph1_placeholder.image('output/bi_plot.png', caption='Browning Index Plot', use_column_width=True)
+                graph2_placeholder.image('output/lab_plot.png', caption='L*a*b* Plot' ,use_column_width=True)
+                
+                image_folder = 'output'  # Update this path to your folder containing the images
+
+
+                zip_data = zip_images_and_dataframe(image_folder, df)
+
+                st.download_button(
+                    label="Download Data (ZIP)",
+                    data=zip_data,
+                    file_name="Dynamic Data.zip",
+                    mime="application/zip"
+                )
                 
                 while (True):
                     # Display extracted images
                     count = 0
                     for image_path in r_images_to_display:
-                        static_placeholder.image(image_path, caption=captions[count], use_column_width=True)
+                        dynamic_placeholder.image(image_path, caption=captions[count], use_column_width=True)
                         count+=1# Display the current extracted image
                         time.sleep(3)  # Wait for 1 second before displaying the next image
