@@ -6,170 +6,250 @@ from skimage import measure
 from PIL import Image
 import pandas as pd
 import time
+import matplotlib.pyplot as plt
 
-import subprocess
 
-try:
-    import cv2
-except ModuleNotFoundError:
-    subprocess.check_call([os.sys.executable, "-m", "pip", "install", "opencv-python-headless"])
-    import cv2
+
 
 # Function to process the uploaded image
 def process_image(image):
-    # Create output directory if it doesn't exist
+    
     output_dir = 'output'
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+        
+    images_to_display = []
 
-    # Read the image
-    image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    image_bgr = image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR) # Load the image in BGR format
+    image_original_path = os.path.join(output_dir, 'original_image.jpg')
+    cv2.imwrite(image_original_path, image_bgr)
+    images_to_display.append(image_original_path)
 
-    # Initialize RGB and LAB values lists, and lists for additional properties
-    rgb_values = []
-    lab_values = []
-    centroids = []
-    diameters = []
-    perimeters = []
-    areas = []
+    def rgb_to_xyz(r, g, b):
+        def first(c):
+            return (((c / 255.0 / 0.055) + 1) * 0.0521) ** 2.4 if c / 255.0 > 0.04045 else c / 255.0 / 12.92
 
-    images_to_display = []  # To store paths of extracted images
-    processed_images = []   # To store paths of processed images (greyscale, binary, etc.)
+        RR, GG, BB = first(r), first(g), first(b)
+        X = (RR * 41.24) + (GG * 35.72) + (BB * 18.05)
+        Y = (RR * 21.26) + (GG * 71.52) + (BB * 7.22)
+        Z = (RR * 1.93) + (GG * 11.92) + (BB * 95.05)
+        
+        return round(X,2), round(Y,2), round(Z,2)
 
-    # Save the original image
-    original_image_path = os.path.join(output_dir, 'original_image.png')
-    # cv2.imwrite(original_image_path, image)
-    processed_images.append(original_image_path)
+    # Define the function to convert XYZ to LAB
+    def xyz_to_lab(X, Y, Z):
+        def second(t):
+            return t ** (1 / 3) if t > 0.008856 else (7.787 * t) + (16 / 116)
 
-    # Convert to greyscale
-    grey_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    grey_image_path = os.path.join(output_dir, 'greyscale_image.png')
-    # cv2.imwrite(grey_image_path, grey_image)
-    processed_images.append(grey_image_path)
+        x, y, z = X / 95.047, Y / 100, Z / 108.883
+        VarX, VarY, VarZ = second(x), second(y), second(z)
 
-    # Apply thresholding to get a binary image
-    _, binary_image = cv2.threshold(grey_image, 128, 255, cv2.THRESH_BINARY_INV)
-    binary_image_path = os.path.join(output_dir, 'binary_image.png')
-    # cv2.imwrite(binary_image_path, binary_image)
-    processed_images.append(binary_image_path)
+        L_star = (116 * VarY) - 16
+        a_star = 500 * (VarX - VarY)
+        b_star = 200 * (VarY - VarZ)
+        
+        return round(L_star), round(a_star), round(b_star)
 
-    # Fill holes in the binary image
-    filled_image = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
-    filled_image_path = os.path.join(output_dir, 'filled_image.png')
-    # cv2.imwrite(filled_image_path, filled_image)
-    processed_images.append(filled_image_path)
+    def rgb_to_lab(r, g, b):
+        x, y, z = rgb_to_xyz(r, g, b)
+        return xyz_to_lab(x, y, z)
 
-    # Apply morphological opening to remove small objects
-    opened_image = cv2.morphologyEx(filled_image, cv2.MORPH_OPEN, np.ones((10, 10), np.uint8))
+    image_gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    image_gray_path = os.path.join(output_dir, 'gray_image.jpg')
+    cv2.imwrite(image_gray_path, image_gray)
+    images_to_display.append(image_gray_path)
 
-    # Remove small objects (less than a certain area)
-    labeled_image = measure.label(opened_image)
-    regions = measure.regionprops(labeled_image)
+    _,triangle = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_TRIANGLE)
+    triangle_path = os.path.join(output_dir, 'triangle.jpg')
+    cv2.imwrite('output/triangle.jpg', triangle)
+    images_to_display.append(triangle_path)
 
-    # Extract only the banana slices (regions in filled image that are white)
-    count = 1
-    for region in regions:
-        if region.area >= 100:  # Threshold for area to filter out small noise
-            minr, minc, maxr, maxc = region.bbox
+    kernel = np.ones((7, 7), np.uint8)
+    opening = cv2.morphologyEx(triangle, cv2.MORPH_OPEN, kernel)
+    opening_path = os.path.join(output_dir, 'opening.jpg')
+    cv2.imwrite(opening_path, opening)
+    images_to_display.append(opening_path)
+    closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, kernel)
+    closing_path = os.path.join(output_dir, 'closing.jpg')
+    cv2.imwrite(closing_path, closing)
+    images_to_display.append(closing_path)
+
+    extraction = cv2.bitwise_and(image_bgr, image_bgr, mask=closing)
+    extraction_path = os.path.join(output_dir, 'extraction.jpg')
+    cv2.imwrite(extraction_path, extraction)
+    images_to_display.append(extraction_path)
+
+    # Find contours of the ROIs
+    contours, _ = cv2.findContours(closing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # List to store the individual masked ROIs
+    roi_rgb = []
+    roi_lab = []
+    roi_bi = []
+    roi_diameter = []
+    roi_perimeter = []
+    roi_area = []
+    roi_centroid = []
+
+    # Iterate over contours to extract each ROI
+    for i, contour in enumerate(contours):
+        # Create an empty mask the same size as the original image
+        mask = np.zeros_like(closing)
+
+        # Draw the contour on the mask, filling it with white
+        cv2.drawContours(mask, [contour], -1, 255, thickness=cv2.FILLED)
+        
+        # Bitwise AND to extract the region of interest (ROI) from the original image
+        roi = cv2.bitwise_and(image_bgr, image_bgr, mask=mask)
+        
+        # Extract only the masked region (non-zero pixels)
+        roi[mask == 0] = [0, 0, 0]  # Set the background (outside contour) to black
+        
+        roi_path = os.path.join(output_dir, f'roi_{i+1}.jpg')
+        cv2.imwrite(roi_path, roi)
+        images_to_display.append(roi_path)
+        
+        # Extract the non-zero pixel locations (where the mask is applied)
+        roi_non_zero_indices = np.where(mask != 0)
+        
+        # Get the R, G, B values of the pixels in the ROI
+        r_values = roi[roi_non_zero_indices[0], roi_non_zero_indices[1], 2]  # Red channel
+        g_values = roi[roi_non_zero_indices[0], roi_non_zero_indices[1], 1]  # Green channel
+        b_values = roi[roi_non_zero_indices[0], roi_non_zero_indices[1], 0]  # Blue channel
+
+        # Calculate the average R, G, B values
+        avg_r = round(np.mean(r_values))
+        avg_g = round(np.mean(g_values))
+        avg_b = round(np.mean(b_values))
+        
+        avg_l, avg_a, avg_bb = rgb_to_lab(avg_r, avg_g, avg_b)
+        
+        roi_rgb.append((avg_r, avg_g, avg_b))
+        roi_lab.append((avg_l, avg_a, avg_bb))
+        
+        k = (avg_a + (1.75*avg_l))/((5.645*avg_l)+avg_a-(3.012*avg_bb))
+        
+        bi = (100*(k-0.31))/0.17
+        roi_bi.append(round(bi))
+        
+        
+    label_image = measure.label(closing)
+
+    # Calculate properties for each labeled region
+    for region in measure.regionprops(label_image):
+        # Area
+        area = region.area
+
+        # Perimeter
+        perimeter = region.perimeter
+
+        # Equivalent Diameter
+        diameter = region.equivalent_diameter
+
+        # Centroid
+        centroid = region.centroid  # (row, column)
+
+        roi_area.append(round(area))
+        roi_perimeter.append(round(perimeter))
+        roi_diameter.append(round(diameter))
+        roi_centroid.append((round(centroid[0]), round(centroid[1])))
+        
+    extraction_lab = cv2.cvtColor(extraction, cv2.COLOR_BGR2LAB)
+
+    # Split the LAB image into L, a, and b channels
+    L, a, b = cv2.split(extraction_lab)
+
+    # Optional: Normalize the L, a, b channels for proper visualization
+    # L is already in the range 0-100 (usually), but a and b need to be adjusted from -128 to 127 to 0-255 for viewing.
+    L_normalized = cv2.normalize(L, None, 0, 255, cv2.NORM_MINMAX)
+    a_normalized = cv2.normalize(a, None, 0, 255, cv2.NORM_MINMAX)
+    b_normalized = cv2.normalize(b, None, 0, 255, cv2.NORM_MINMAX)
+
+    # Save the L, a, and b channel images individually
+    L_image_path = os.path.join(output_dir, 'L_image.jpg')
+    cv2.imwrite(L_image_path, L_normalized)
+    images_to_display.append(L_image_path)
+    a_image_path = os.path.join(output_dir, 'a_image.jpg')
+    cv2.imwrite(a_image_path, a_normalized)
+    images_to_display.append(a_image_path)
+    b_image_path = os.path.join(output_dir, 'b_image.jpg')
+    cv2.imwrite(b_image_path, b_normalized)
+    images_to_display.append(b_image_path)
+        
+    images_to_display = [s.replace('\\', '/') for s in images_to_display]
+
+    return roi_rgb, roi_lab, roi_centroid, roi_diameter, roi_perimeter, roi_area, roi_bi, images_to_display
+
+
+
+
+
+
+
+
+# Program starts here
+if __name__ == "__main__":
+
+    # Set the title of the app
+    st.markdown("<h1 style='text-align: center;'>Drying Analyzer</h1>", unsafe_allow_html=True)
+
+    # Create a hamburger menu using selectbox
+    option = st.selectbox(
+        "Select Mode",
+        ["Select Mode", "Static", "Dynamic"],
+        index=0,
+    )
+
+
+
+
+
+
+
+    # Check the selected mode
+    if option == "Static":
+        
+        st.markdown("<h2 style='text-align: center;'>Select Parameters</h2>", unsafe_allow_html=True)
+        
+        # List of parameters with checkboxes
+        parameters = [
+            "Browning Index",
+            "RGB",
+            "L* a* b*",
+            "Centroid",
+            "Equivalent Diameter",
+            "Perimeter",
+            "Area",
+        ]
+        
+        define_all = st.checkbox('Select All')
+
+        # Initialize the dictionary to store parameter selections
+        selected_params = {param: False for param in parameters}
+
+        # Generate checkboxes based on 'Select All' state
+        for option in parameters:
+            selected_params[option] = st.checkbox(option, value=define_all)
+        
+        # Centered button to open Google
+        st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Open Camera</button></a></div>", unsafe_allow_html=True)
+        
+        # Add a gap below the "Open Camera" button
+        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
             
-            # Create a mask for the current region
-            mask = np.zeros(filled_image.shape, dtype=np.uint8)
-            mask[minr:maxr, minc:maxc] = (labeled_image[minr:maxr, minc:maxc] == region.label).astype(np.uint8)
+        
+        
 
-            # Extract the region from the original image using the mask
-            extracted_slice = cv2.bitwise_and(image, image, mask=mask)
+        # Button to upload image
+        uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+        
+        if uploaded_file is not None:
+            # Display the uploaded image
+            image = Image.open(uploaded_file)
+            st.image(image, use_column_width=True, caption='Uploaded Image', output_format='PNG')
 
-            # Save the extracted slice
-            extracted_slice_path = os.path.join(output_dir, f'extracted_slice_{count}.png')
-            cv2.imwrite(extracted_slice_path, extracted_slice)
-            images_to_display.append(extracted_slice_path)  # Save the path for later display
-            count += 1
-
-            # Calculate RGB and LAB values for the extracted slice
-            avg_rgb = cv2.mean(extracted_slice, mask=mask)[:3]  # Get average RGB values
-            lab_image = cv2.cvtColor(extracted_slice, cv2.COLOR_BGR2LAB)
-            avg_lab = cv2.mean(lab_image, mask=mask)[:3]  # Get average LAB values
-
-            # Calculate centroid, equivalent diameter, perimeter, and area
-            centroid = region.centroid  # (y, x)
-            eq_diameter = region.equivalent_diameter
-            perimeter = region.perimeter
-            area = region.area
-
-            # Store the values
-            rgb_values.append([int(round(val)) for val in avg_rgb])
-            lab_values.append([int(round(val)) for val in avg_lab])
-            centroids.append(centroid)
-            diameters.append(eq_diameter)
-            perimeters.append(perimeter)
-            areas.append(area)
-
-    return rgb_values, lab_values, centroids, diameters, perimeters, areas, images_to_display, processed_images
-
-# Set the title of the app
-st.markdown("<h1 style='text-align: center;'>Drying Analyzer</h1>", unsafe_allow_html=True)
-
-# Create a hamburger menu using selectbox
-option = st.selectbox(
-    "Select Mode",
-    ["Select Mode", "Static", "Dynamic"],
-    index=0,
-)
-
-# Check the selected mode
-if option == "Static":
-    
-    st.markdown("<h2 style='text-align: center;'>Select Parameters</h2>", unsafe_allow_html=True)
-    
-    # List of parameters with checkboxes
-    parameters = [
-        "Broning Index",
-        "RGB",
-        "LAB",
-        "Centroid",
-        "Equivalent Diameter",
-        "Perimeter",
-        "Area"
-    ]
-    
-    define_all = st.checkbox('Select All')
-
-    # Initialize the dictionary to store parameter selections
-    selected_params = {param: False for param in parameters}
-
-    # Generate checkboxes based on 'Select All' state
-    for option in parameters:
-        selected_params[option] = st.checkbox(option, value=define_all)
-    
-    
-    
-    # # Master 'Select All' checkbox
-    # define_all = st.checkbox('Select All')
-    
-    # # Generate checkboxes based on 'Select All' state
-    # for option in parameters:
-    #     st.checkbox(option, value=define_all)
-    
-    # selected_params = {param: st.checkbox(param, key=param) for param in parameters}
-    
-    # Centered button to open Google
-    st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Open Camera</button></a></div>", unsafe_allow_html=True)
-    
-    # Add a gap below the "Open Camera" button
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
-
-    # Button to upload image
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-    
-    if uploaded_file is not None:
-        # Display the uploaded image
-        image = Image.open(uploaded_file)
-        st.image(image, use_column_width=True, caption='Uploaded Image', output_format='PNG')
-
-        # Centered button to show results with the same style as "Open Camera"
-        if st.button("Show Results", key="show_results"):
             # Process the uploaded image and get RGB, LAB values, and image paths
-            rgb_values, lab_values, centroids, diameters, perimeters, areas, images_to_display, processed_images = process_image(image)
+            rgb_values, lab_values, centroids, diameters, perimeters, areas, bi, images_to_display = process_image(image)
 
             # Prepare data dictionary based on selected parameters
             data = {}
@@ -178,9 +258,15 @@ if option == "Static":
             data["Blob"] = [f"Blob {i + 1}" for i in range(len(rgb_values))]
             
             if selected_params.get("RGB"):
-                data["RGB Values"] = [f"({r[0]}, {r[1]}, {r[2]})" for r in rgb_values]
-            if selected_params.get("LAB"):
-                data["LAB Values"] = [f"({l[0]}, {l[1]}, {l[2]})" for l in lab_values]
+                data['R'] = [r[0] for r in rgb_values]
+                data['G'] = [r[1] for r in rgb_values]
+                data['B'] = [r[2] for r in rgb_values]
+            if selected_params.get("L*a*b*"):
+                data['L*'] = [l[0] for l in lab_values]
+                data['a*'] = [l[1] for l in lab_values]
+                data['b*'] = [l[2] for l in lab_values]
+            if selected_params.get("Browning Index"):
+                data["Browning Index"] = bi
             if selected_params.get("Centroid"):
                 data["Centroid"] = [f"({round(c[0], 2)}, {round(c[1], 2)})" for c in centroids]
             if selected_params.get("Equivalent Diameter"):
@@ -193,82 +279,231 @@ if option == "Static":
 
             # Create a DataFrame to display results in a table
             results_df = pd.DataFrame(data)
+            df = results_df.set_index('Blob')
 
             # Display the results in a table format
-            st.markdown("<h3 style='text-align: center;'>Results:</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center;'>Results</h3>", unsafe_allow_html=True)
             st.dataframe(results_df.style.set_table_attributes('style="margin:auto; width:80%;"'))
 
             # Animate the images side by side
-            st.markdown("<h3 style='text-align: center;'>Extracted and Processed Images:</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center;'>Image Processing Steps</h3>", unsafe_allow_html=True)
             
             # Create placeholders for extracted and processed images
-            extracted_placeholder = st.empty()
-            processed_placeholder = st.empty()
+            static_placeholder = st.empty()
             
-            # Number of times to repeat the animation
-            repeat_count = 2
+            caption1 = ['Orginial Image', 'Greyscale Image', 'Triangular Thresholding', 'Morphological Opening', 'Morphological Closing', 'Extracted Regions']
+            caption2 = [f'ROI {i+1}' for i in range(0, len(rgb_values))]
+            caption3 = ['L Channel', 'a Channel', 'b Channel']
             
-            for _ in range(repeat_count):
+            captions = caption1 + caption2 + caption3
+            
+            while (True):
                 # Display extracted images
+                count = 0
                 for image_path in images_to_display:
-                    extracted_placeholder.image(image_path, use_column_width=True)  # Display the current extracted image
-                    time.sleep(1)  # Wait for 1 second before displaying the next image
+                    static_placeholder.image(image_path, caption=captions[count], use_column_width=True)
+                    count+=1# Display the current extracted image
+                    time.sleep(3)  # Wait for 1 second before displaying the next image
                 
-                # Display processed images
-                for image_path in processed_images:
-                    processed_placeholder.image(image_path, use_column_width=True)  # Display the current processed image
-                    time.sleep(1)  # Wait for 1 second before displaying the next image
 
 
-elif option == "Dynamic":
-    st.markdown("<h2 style='text-align: center;'>Select Parameters</h2>", unsafe_allow_html=True)
-    
-    # List of parameters with checkboxes
-    parameters = [
-        "Broning Index",
-        "RGB",
-        "LAB",
-        "Centroid",
-        "Equivalent Diameter",
-        "Perimeter",
-        "Area"
-    ]
-    
-    define_all = st.checkbox('Select All')
 
-    # Initialize the dictionary to store parameter selections
-    selected_params = {param: False for param in parameters}
 
-    # Generate checkboxes based on 'Select All' state
-    for option in parameters:
-        selected_params[option] = st.checkbox(option, value=define_all)
-    
-    # Centered button to open Google
-    st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Take Reference Image</button></a></div>", unsafe_allow_html=True)
-    
-    # Add a gap below the "Take Reference Image" button
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
 
-    # Button to upload single image
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-    
-    if uploaded_file is not None:
-        # Display the uploaded image
-        image = Image.open(uploaded_file)
-        st.image(image, use_column_width=True, caption='Uploaded Image', output_format='PNG')
 
-        # Show the new button after the image is uploaded
-        st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Upload Image(s)</button></a></div>", unsafe_allow_html=True)
-    
+
+
+
+
+
+    elif option == "Dynamic":
+        
+        st.markdown("<h2 style='text-align: center;'>Select Parameters</h2>", unsafe_allow_html=True)
+        
+        # List of parameters with checkboxes
+        parameters = [
+            "Browning Index",
+            "RGB",
+            "L* a* b*",
+            "Centroid",
+            "Equivalent Diameter",
+            "Perimeter",
+            "Area",
+            "∆E"
+        ]
+        
+        define_all = st.checkbox('Select All')
+
+        # Initialize the dictionary to store parameter selections
+        selected_params = {param: False for param in parameters}
+
+        # Generate checkboxes based on 'Select All' state
+        for option in parameters:
+            selected_params[option] = st.checkbox(option, value=define_all)
+        
+        # Centered button to open Google
+        st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Take Reference Image</button></a></div>", unsafe_allow_html=True)
+        
         # Add a gap below the "Take Reference Image" button
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
 
+        # Button to upload single image
+        uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+        
+        if uploaded_file is not None:
+            # Display the uploaded image
+            image = Image.open(uploaded_file)
+            st.image(image, use_column_width=True, caption='Uploaded Reference Image', output_format='PNG')
 
-        # New button to upload multiple images
-        multiple_files = st.file_uploader("Upload Multiple Images", type=["jpg", "jpeg", "png"], label_visibility="collapsed", accept_multiple_files=True)
+            # Show the new button after the image is uploaded
+            st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Upload Image(s)</button></a></div>", unsafe_allow_html=True)
+        
+            # Add a gap below the "Take Reference Image" button
+            st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
 
-        if multiple_files is not None:
-            st.markdown("<h3 style='text-align: center;'>Uploaded Images:</h3>", unsafe_allow_html=True)
-            for uploaded in multiple_files:
-                image = Image.open(uploaded)
-                st.image(image, use_column_width=True, caption=uploaded.name, output_format='PNG')
+            # New button to upload multiple images
+            multiple_files = st.file_uploader("Upload Multiple Images", type=["jpg", "jpeg", "png"], label_visibility="collapsed", accept_multiple_files=True)
+            
+            # Process the uploaded Reference image and get RGB, LAB values, and image paths
+            r_rgb_values, r_lab_values, r_centroids, r_diameters, r_perimeters, r_areas, r_bi, r_images_to_display = process_image(image)
+            
+            
+            # Function to extract timestamps from filenames in the format YYYYMMDDHHMMSS
+            def extract_timestamp_from_filename(filename):
+                try:
+                    timestamp_str = filename.split(".")[0]  # Assuming the filename is YYYYMMDDHHMMSS.jpg
+                    timestamp = pd.to_datetime(timestamp_str, format='%Y%m%d%H%M%S')
+                    return timestamp
+                except Exception as e:
+                    return pd.Timestamp.min  # Return a minimal timestamp in case of failure.
+                
+            # Function to process multiple images and display results in a table
+            def process_images(images):
+                data = []
+                
+                for idx, image_file in enumerate(images):
+                    image = Image.open(image_file)
+                    rgb_values, lab_values, centroids, diameters, perimeters, areas, bi, _ = process_image(image)
+
+                    image_label = f"{idx + 1}"  # Sequential naming for images
+                    
+                    for i in range(len(rgb_values)):
+                            
+                        row = {
+                            'Image No.': image_label,  # Use sequential image names
+                            'Blob': f'{i + 1}',
+                            'R': rgb_values[i][0],
+                            'G': rgb_values[i][1],
+                            'B': rgb_values[i][2],
+                            'L*': lab_values[i][0],
+                            'a*': lab_values[i][1],
+                            'b*': lab_values[i][2],
+                            'BI': bi[i],
+                            'x': int(round(centroids[i][1])),  # x-coordinate (column index, hence 1st element)
+                            'y': int(round(centroids[i][0])),  # y-coordinate (row index, hence 0th element)
+                            'Equivalent Diameter': diameters[i],
+                            'Perimeter': perimeters[i],
+                            'Area': areas[i]
+                            # '∆E' : round(np.sqrt((r_lab_values[i][0] - lab_values[i][0]) ** 2 + (r_lab_values[i][1] - lab_values[i][1]) ** 2 + (r_lab_values[i][2] - lab_values[i][2]) ** 2))
+                        }
+                        data.append(row)
+                
+                return pd.DataFrame(data)
+
+            # Table Making
+            if multiple_files:
+                # Sort the uploaded images based on their filenames
+                sorted_files = sorted(multiple_files, key=lambda x: extract_timestamp_from_filename(x.name))
+                
+                # Process the images and create a DataFrame to store the results
+                results_df = process_images(sorted_files)
+                df = results_df.set_index('Image No.')
+                
+                
+                
+                
+                
+                
+                
+                # GRAPHS CODE
+                st.markdown("<h2 style='text-align: center;'>Graphs</h2>", unsafe_allow_html=True)
+                
+                files = [f.name for f in multiple_files]
+                filenames = [f.split(".")[0] for f in files]
+                
+                # Group by 'Image' and calculate the mean for each group
+                results_df_avg = results_df.groupby('Image No.').mean()
+                
+                # Reset the index (optional, but makes the DataFrame cleaner)
+                results_df_avg = results_df_avg.reset_index()
+                
+                def time_difference_in_seconds(t1, t2):
+                    year_diff = (int(t2[:4]) - int(t1[:4])) * 365 * 24 * 3600  # Year difference
+                    month_diff = (int(t2[4:6]) - int(t1[4:6])) * 30 * 24 * 3600  # Month difference (approx 30 days)
+                    day_diff = (int(t2[6:8]) - int(t1[6:8])) * 24 * 3600  # Day difference
+                    hour_diff = (int(t2[8:10]) - int(t1[8:10])) * 3600  # Hour difference
+                    minute_diff = (int(t2[10:12]) - int(t1[10:12])) * 60  # Minute difference
+                    second_diff = int(t2[12:14]) - int(t1[12:14])  # Second difference
+                    
+                    return year_diff + month_diff + day_diff + hour_diff + minute_diff + second_diff
+                
+                # Calculate time differences in hours with reference to the first image
+                
+                reference = filenames[0]
+                time_differences = [time_difference_in_seconds(reference, f) / 3600 for f in filenames]
+
+                
+                plt.figure()
+                plt.plot(time_differences, results_df_avg['BI'], marker='o', markersize=5, color='blue', label='Browning Index')
+                plt.title('Browning Index Plot')
+                plt.xlabel('Time (hours)')
+                plt.ylabel('Average BI')
+                plt.legend(loc = 'upper right')
+                plt.savefig('output/bi_plot.png')
+                
+                plt.figure()
+                plt.plot(time_differences, results_df_avg['L*'], marker='o', markersize=5, color='blue', label='L*')
+                plt.plot(time_differences, results_df_avg['a*'], marker='^', markersize=5, color='red', label='a*')
+                plt.plot(time_differences, results_df_avg['b*'], marker='d', markersize=5, color='green', label='b*')
+                plt.title('L*a*b* Colour')
+                plt.xlabel('Time, hours')
+                plt.ylabel('Average Color')
+                plt.legend(loc = 'upper right')
+                plt.savefig('output/lab_plot.png')
+                
+                
+                graph1_placeholder = st.empty()
+                graph2_placeholder = st.empty()
+                
+                graph1_placeholder.image('output/bi_plot.png', caption='Browning Index Plot', use_column_width=True)
+                graph2_placeholder.image('output/lab_plot.png', caption='L*a*b* Plot' ,use_column_width=True)
+                
+                
+                
+                
+                
+                
+                # Display the results in a table
+                st.markdown("<h2 style='text-align: center;'>Results</h2>", unsafe_allow_html=True)
+                st.dataframe(df)
+                
+                # Animate the images side by side
+                st.markdown("<h3 style='text-align: center;'>Image Processing Steps</h3>", unsafe_allow_html=True)
+                
+                # Create placeholders for extracted and processed images
+                static_placeholder = st.empty()
+                
+                caption1 = ['Orginial Image', 'Greyscale Image', 'Triangular Thresholding', 'Morphological Opening', 'Morphological Closing', 'Extracted Regions']
+                caption2 = [f'ROI {i+1}' for i in range(0, len(r_lab_values))]
+                caption3 = ['L Channel', 'a Channel', 'b Channel']
+                
+                captions = caption1 + caption2 + caption3
+                
+                
+                while (True):
+                    # Display extracted images
+                    count = 0
+                    for image_path in r_images_to_display:
+                        static_placeholder.image(image_path, caption=captions[count], use_column_width=True)
+                        count+=1# Display the current extracted image
+                        time.sleep(3)  # Wait for 1 second before displaying the next image
