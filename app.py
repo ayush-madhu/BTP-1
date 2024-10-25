@@ -9,7 +9,7 @@ import time
 import matplotlib.pyplot as plt
 from io import BytesIO
 import zipfile
-
+import shutil
 
 
 
@@ -18,6 +18,9 @@ def process_image(image):
     
     output_dir = 'output'
     if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    else:
+        shutil.rmtree(output_dir)
         os.makedirs(output_dir)
         
     images_to_display = []
