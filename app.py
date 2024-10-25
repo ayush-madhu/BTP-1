@@ -13,6 +13,8 @@ import shutil
 
 
 
+
+
 # Function to process the uploaded image
 def process_image(image):
     
@@ -25,7 +27,7 @@ def process_image(image):
         
     images_to_display = []
 
-    image_bgr = image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR) # Load the image in BGR format
+    image_bgr = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR) # Load the image in BGR format
     image_original_path = os.path.join(output_dir, 'original_image.jpg')
     cv2.imwrite(image_original_path, image_bgr)
     images_to_display.append(image_original_path)
@@ -403,15 +405,6 @@ if __name__ == "__main__":
             # Process the uploaded Reference image and get RGB, LAB values, and image paths
             r_rgb_values, r_lab_values, r_centroids, r_diameters, r_perimeters, r_areas, r_bi, r_images_to_display = process_image(image)
             
-            
-            # Function to extract timestamps from filenames in the format YYYYMMDDHHMMSS
-            def extract_timestamp_from_filename(filename):
-                try:
-                    timestamp_str = filename.split(".")[0]  # Assuming the filename is YYYYMMDDHHMMSS.jpg
-                    timestamp = pd.to_datetime(timestamp_str, format='%Y%m%d%H%M%S')
-                    return timestamp
-                except Exception as e:
-                    return pd.Timestamp.min  # Return a minimal timestamp in case of failure.
                 
             # Function to process multiple images and display results in a table
             def process_images(images):
@@ -448,29 +441,42 @@ if __name__ == "__main__":
 
             # Table Making
             if multiple_files:
-                # Sort the uploaded images based on their filenames
-                sorted_files = sorted(multiple_files, key=lambda x: extract_timestamp_from_filename(x.name))
+                
+                multiple_files_names = [int(f.name.split('.')[0]) for f in multiple_files]
+                uploaded_file_name = int(uploaded_file.name.split('.')[0])
+                all_files = [uploaded_file] + multiple_files
+                all_files_names = [uploaded_file_name] + multiple_files_names
+                
+                # Combine the lists with their indices
+                combined = [(index, all_files[index], all_files_names[index]) for index in range(len(all_files))]
+
+                # Sort combined by the second element of the tuple (which is List2 values)
+                sorted_combined = sorted(combined, key=lambda x: x[2])  # Sort by List2 values
+
+                # Create a new List1 based on the sorted order of List2
+                all_files_sorted = [item[1] for item in sorted_combined]
+                
+                
                 
                 # Process the images and create a DataFrame to store the results
-                results_df = process_images(sorted_files)
+                results_df = process_images(all_files_sorted)
                 df = results_df.set_index('Image No.')
                 
                 
                 
-                
-                
-                
-                
                 # GRAPHS CODE
-                
-                files = [f.name for f in multiple_files]
+                files = [f.name for f in all_files_sorted]
                 filenames = [f.split(".")[0] for f in files]
+                
                 
                 # Group by 'Image' and calculate the mean for each group
                 results_df_avg = results_df.groupby('Image No.').mean()
                 
+                
                 # Reset the index (optional, but makes the DataFrame cleaner)
                 results_df_avg = results_df_avg.reset_index()
+                
+                # results_df_avg = pd.concat([pd.DataFrame([new_row]), results_df_avg], ignore_index=True)
                 
                 def time_difference_in_seconds(t1, t2):
                     year_diff = (int(t2[:4]) - int(t1[:4])) * 365 * 24 * 3600  # Year difference
