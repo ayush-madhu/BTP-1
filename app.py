@@ -417,24 +417,31 @@ if __name__ == "__main__":
                     image_label = f"{idx + 1}"  # Sequential naming for images
                     
                     for i in range(len(rgb_values)):
+                        row = {}
+                        row['Image No.'] = image_label
+                        row['Blob'] = f'{i + 1}'
+                        if selected_params.get("RGB"):
+                            row['R'] = rgb_values[i][0]
+                            row['G'] = rgb_values[i][1]
+                            row['B'] = rgb_values[i][2]
+                        if selected_params.get("L* a* b*"):
+                            row['L*'] = lab_values[i][0]
+                            row['a*'] = lab_values[i][1]
+                            row['b*'] = lab_values[i][2]
+                        if selected_params.get("Browning Index"):
+                            row['BI'] = bi[i]
+                        if selected_params.get("Centroid"):
+                            row['x'] = int(round(centroids[i][1]))
+                            row['y'] = int(round(centroids[i][0]))
+                        if selected_params.get("Equivalent Diameter"):
+                            row['Equivalent Diameter'] = diameters[i]
+                        if selected_params.get("Perimeter"):
+                            row['Perimeter'] = perimeters[i]
+                        if selected_params.get("Area"):
+                            row['Area'] = areas[i]
+                        if selected_params.get("∆E"):
+                            row['∆E'] = round(np.sqrt((r_lab_values[i][0] - lab_values[i][0]) ** 2 + (r_lab_values[i][1] - lab_values[i][1]) ** 2 + (r_lab_values[i][2] - lab_values[i][2]) ** 2))
                             
-                        row = {
-                            'Image No.': image_label,  # Use sequential image names
-                            'Blob': f'{i + 1}',
-                            'R': rgb_values[i][0],
-                            'G': rgb_values[i][1],
-                            'B': rgb_values[i][2],
-                            'L*': lab_values[i][0],
-                            'a*': lab_values[i][1],
-                            'b*': lab_values[i][2],
-                            'BI': bi[i],
-                            'x': int(round(centroids[i][1])),  # x-coordinate (column index, hence 1st element)
-                            'y': int(round(centroids[i][0])),  # y-coordinate (row index, hence 0th element)
-                            'Equivalent Diameter': diameters[i],
-                            'Perimeter': perimeters[i],
-                            'Area': areas[i]
-                            # '∆E' : round(np.sqrt((r_lab_values[i][0] - lab_values[i][0]) ** 2 + (r_lab_values[i][1] - lab_values[i][1]) ** 2 + (r_lab_values[i][2] - lab_values[i][2]) ** 2))
-                        }
                         data.append(row)
                 
                 return pd.DataFrame(data)
