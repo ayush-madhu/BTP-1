@@ -500,24 +500,25 @@ if __name__ == "__main__":
                 reference = filenames[0]
                 time_differences = [time_difference_in_seconds(reference, f) / 3600 for f in filenames]
 
-                
-                plt.figure()
-                plt.plot(time_differences, results_df_avg['BI'], marker='o', markersize=5, color='blue', label='Browning Index')
-                plt.title('Browning Index Plot')
-                plt.xlabel('Time (hours)')
-                plt.ylabel('Average BI')
-                plt.legend(loc = 'upper right')
-                plt.savefig('output/bi_plot.png')
-                
-                plt.figure()
-                plt.plot(time_differences, results_df_avg['L*'], marker='o', markersize=5, color='blue', label='L*')
-                plt.plot(time_differences, results_df_avg['a*'], marker='^', markersize=5, color='red', label='a*')
-                plt.plot(time_differences, results_df_avg['b*'], marker='d', markersize=5, color='green', label='b*')
-                plt.title('L*a*b* Colour')
-                plt.xlabel('Time, hours')
-                plt.ylabel('Average Color')
-                plt.legend(loc = 'upper right')
-                plt.savefig('output/lab_plot.png')
+                if selected_params.get("Browning Index"):
+                    plt.figure()
+                    plt.plot(time_differences, results_df_avg['BI'], marker='o', markersize=5, color='blue', label='Browning Index')
+                    plt.title('Browning Index Plot')
+                    plt.xlabel('Time (hours)')
+                    plt.ylabel('Average BI')
+                    plt.legend(loc = 'upper right')
+                    plt.savefig('output/bi_plot.png')
+
+                if selected_params.get("L* a* b*"):
+                    plt.figure()
+                    plt.plot(time_differences, results_df_avg['L*'], marker='o', markersize=5, color='blue', label='L*')
+                    plt.plot(time_differences, results_df_avg['a*'], marker='^', markersize=5, color='red', label='a*')
+                    plt.plot(time_differences, results_df_avg['b*'], marker='d', markersize=5, color='green', label='b*')
+                    plt.title('L*a*b* Colour')
+                    plt.xlabel('Time, hours')
+                    plt.ylabel('Average Color')
+                    plt.legend(loc = 'upper right')
+                    plt.savefig('output/lab_plot.png')
                 
                 
                 
