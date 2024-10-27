@@ -543,11 +543,15 @@ if __name__ == "__main__":
                 captions = caption1 + caption2 + caption3
                 
                 st.markdown("<h2 style='text-align: center;'>Graphs</h2>", unsafe_allow_html=True)
-                graph1_placeholder = st.empty()
-                graph2_placeholder = st.empty()
+
+                if selected_params.get("Browning Index"):
+                    graph1_placeholder = st.empty()
+                    graph1_placeholder.image('output/bi_plot.png', caption='Browning Index Plot', use_column_width=True)
+                if selected_params.get("L* a* b*"):
+                    graph2_placeholder = st.empty()
+                    graph2_placeholder.image('output/lab_plot.png', caption='L*a*b* Plot' ,use_column_width=True)
                 
-                graph1_placeholder.image('output/bi_plot.png', caption='Browning Index Plot', use_column_width=True)
-                graph2_placeholder.image('output/lab_plot.png', caption='L*a*b* Plot' ,use_column_width=True)
+                
                 
                 image_folder = 'output'  # Update this path to your folder containing the images
 
