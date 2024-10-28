@@ -417,7 +417,7 @@ if __name__ == "__main__":
                     if (idx==0):
                         image_label = 'Reference'
                     else:
-                        image_label = f"Image {idx + 1}"  # Sequential naming for images
+                        image_label = f"Image {idx}"  # Sequential naming for images
                     
                     for i in range(len(rgb_values)):
                         row = {}
