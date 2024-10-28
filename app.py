@@ -439,8 +439,8 @@ if __name__ == "__main__":
                             row['Perimeter'] = perimeters[i]
                         if selected_params.get("Area"):
                             row['Area'] = areas[i]
-                        if selected_params.get("∆E"):
-                            row['∆E'] = round(np.sqrt((r_lab_values[i][0] - lab_values[i][0]) ** 2 + (r_lab_values[i][1] - lab_values[i][1]) ** 2 + (r_lab_values[i][2] - lab_values[i][2]) ** 2))
+                        #if selected_params.get("∆E"):
+                           # row['∆E'] = round(np.sqrt((r_lab_values[i][0] - lab_values[i][0]) ** 2 + (r_lab_values[i][1] - lab_values[i][1]) ** 2 + (r_lab_values[i][2] - lab_values[i][2]) ** 2))
                             
                         data.append(row)
                 
