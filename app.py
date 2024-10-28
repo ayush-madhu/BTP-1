@@ -414,7 +414,10 @@ if __name__ == "__main__":
                     image = Image.open(image_file)
                     rgb_values, lab_values, centroids, diameters, perimeters, areas, bi, _ = process_image(image)
 
-                    image_label = f"{idx + 1}"  # Sequential naming for images
+                    if (idx==0):
+                        image_label = 'Reference'
+                    else:
+                        image_label = f"Image {idx + 1}"  # Sequential naming for images
                     
                     for i in range(len(rgb_values)):
                         row = {}
@@ -520,14 +523,14 @@ if __name__ == "__main__":
                     plt.legend(loc = 'upper right')
                     plt.savefig('output/lab_plot.png')
 
-                # if selected_params.get("∆E"):
-                #     plt.figure()
-                #     plt.plot(time_differences, results_df_avg['∆E'], marker='o', markersize=5, color='blue', label='∆E')
-                #     plt.title('∆E')
-                #     plt.xlabel('Time, hours')
-                #     plt.ylabel('Colour Difference (∆E)')
-                #     plt.legend(loc = 'upper right')
-                #     plt.savefig('output/dele_plot.png')
+                if selected_params.get("∆E"):
+                    plt.figure()
+                    plt.plot(time_differences, results_df_avg['∆E'], marker='o', markersize=5, color='blue', label='∆E')
+                    plt.title('∆E')
+                    plt.xlabel('Time, hours')
+                    plt.ylabel('Colour Difference (∆E)')
+                    plt.legend(loc = 'upper right')
+                    plt.savefig('output/dele_plot.png')
                 
                 
                 
@@ -559,9 +562,9 @@ if __name__ == "__main__":
                 if selected_params.get("L* a* b*"):
                     graph2_placeholder = st.empty()
                     graph2_placeholder.image('output/lab_plot.png', caption='L*a*b* Plot' ,use_column_width=True)
-                # if selected_params.get("∆E"):
-                #     graph3_placeholder = st.empty()
-                #     graph3_placeholder.image('output/dele_plot.png', caption='Del E Plot' ,use_column_width=True)
+                if selected_params.get("∆E"):
+                    graph3_placeholder = st.empty()
+                    graph3_placeholder.image('output/dele_plot.png', caption='Del E Plot' ,use_column_width=True)
                 
                 
                 
