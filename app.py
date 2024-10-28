@@ -440,7 +440,7 @@ if __name__ == "__main__":
                         if selected_params.get("Area"):
                             row['Area'] = areas[i]
                         if selected_params.get("∆E"):
-                            row['∆E'] = round(np.sqrt((r_lab_values[0] - lab_values[i][0]) ** 2 + (r_lab_values[1] - lab_values[i][1]) ** 2 + (r_lab_values[2] - lab_values[i][2]) ** 2))
+                            row['∆E'] = round(np.sqrt((lab_values[0][0] - lab_values[i][0]) ** 2 + (lab_values[0][1] - lab_values[i][1]) ** 2 + (lab_values[0][2] - lab_values[i][2]) ** 2))
                             
                         data.append(row)
                 
