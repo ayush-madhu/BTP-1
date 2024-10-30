@@ -14,7 +14,6 @@ import shutil
 
 
 
-
 # Function to process the uploaded image
 def process_image(image):
     
@@ -135,7 +134,7 @@ def process_image(image):
         roi_lab.append((avg_l, avg_a, avg_bb))
         
         k = (avg_a + (1.75*avg_l))/((5.645*avg_l)+avg_a-(3.012*avg_bb))
-        
+
         bi = (100*(k-0.31))/0.17
         roi_bi.append(round(bi))
         
@@ -184,9 +183,24 @@ def process_image(image):
     images_to_display.append(b_image_path)
         
     images_to_display = [s.replace('\\', '/') for s in images_to_display]
+    images_to_display = [s.replace('\\\\', '/') for s in images_to_display]
+    
+    avg_r = round(np.mean([rgb[0] for rgb in roi_rgb]))
+    avg_g = round(np.mean([rgb[1] for rgb in roi_rgb]))
+    avg_b = round(np.mean([rgb[2] for rgb in roi_rgb]))
+    avg_l = round(np.mean([lab[0] for lab in roi_lab]))
+    avg_a = round(np.mean([lab[1] for lab in roi_lab]))
+    avg_b = round(np.mean([lab[2] for lab in roi_lab]))
+    avg_c_x = round(np.mean([c[0] for c in roi_centroid]))
+    avg_c_y = round(np.mean([c[1] for c in roi_centroid]))
+    avg_area = round(np.mean(roi_area))
+    avg_perimeter = round(np.mean(roi_perimeter))
+    avg_diameter = round(np.mean(roi_diameter))
+    avg_bi = round(np.mean(roi_bi))
+    
+    n = len(roi_rgb)
 
-    return roi_rgb, roi_lab, roi_centroid, roi_diameter, roi_perimeter, roi_area, roi_bi, images_to_display
-
+    return avg_r, avg_g, avg_b, avg_l, avg_a, avg_b, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_c_x, avg_c_y, n, images_to_display
 
 
 
@@ -261,7 +275,7 @@ if __name__ == "__main__":
             selected_params[option] = st.checkbox(option, value=define_all)
         
         # Centered button to open Google
-        st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Open Camera</button></a></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'><a href='http://192.168.253.102/' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Open Camera</button></a></div>", unsafe_allow_html=True)
         
         # Add a gap below the "Open Camera" button
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
@@ -278,55 +292,84 @@ if __name__ == "__main__":
             st.image(image, use_column_width=True, caption='Uploaded Image', output_format='PNG')
 
             # Process the uploaded image and get RGB, LAB values, and image paths
-            rgb_values, lab_values, centroids, diameters, perimeters, areas, bi, images_to_display = process_image(image)
+            r, g, b, l, a, b, area, perimeter, diameter, bi, c_x, c_y, n, images_to_display = process_image(image)
 
             # Prepare data dictionary based on selected parameters
-            data = {}
+            data = {"Parameters" : [],
+                    "Values" : []}
+            
+            
             
             # Add Region column to the data
-            data["Blob"] = [f"Blob {i + 1}" for i in range(len(rgb_values))]
             
             if selected_params.get("RGB"):
-                data['R'] = [r[0] for r in rgb_values]
-                data['G'] = [r[1] for r in rgb_values]
-                data['B'] = [r[2] for r in rgb_values]
-            if selected_params.get("L*a*b*"):
-                data['L*'] = [l[0] for l in lab_values]
-                data['a*'] = [l[1] for l in lab_values]
-                data['b*'] = [l[2] for l in lab_values]
+                data['Parameters'].append('R')
+                data['Parameters'].append('G')
+                data['Parameters'].append('B')
+                data['Values'].append(r)
+                data['Values'].append(g)
+                data['Values'].append(b)
+            if selected_params.get("L* a* b*"):
+                data['Parameters'].append('L*')
+                data['Parameters'].append('a*')
+                data['Parameters'].append('b*')
+                data['Values'].append(l)
+                data['Values'].append(a)
+                data['Values'].append(b)
             if selected_params.get("Browning Index"):
-                data["Browning Index"] = bi
+                data['Parameters'].append('BI')
+                data['Values'].append(bi)
             if selected_params.get("Centroid"):
-                data["Centroid"] = [f"({round(c[0], 2)}, {round(c[1], 2)})" for c in centroids]
+                data['Parameters'].append('x')
+                data['Parameters'].append('y')
+                data['Values'].append(c_x)
+                data['Values'].append(c_y)               
             if selected_params.get("Equivalent Diameter"):
-                data["Equivalent Diameter"] = [round(d, 2) for d in diameters]
+                data['Parameters'].append('Diameter')
+                data['Values'].append(diameter)
             if selected_params.get("Perimeter"):
-                data["Perimeter"] = [round(p, 2) for p in perimeters]
+                data['Parameters'].append('Perimeter')
+                data['Values'].append(perimeter)
             if selected_params.get("Area"):
-                data["Area"] = areas
-
-
+                data['Parameters'].append('Area')
+                data['Values'].append(area)
+                
+                
             # Create a DataFrame to display results in a table
             results_df = pd.DataFrame(data)
-            df = results_df.set_index('Blob')
 
             # Display the results in a table format
             st.markdown("<h3 style='text-align: center;'>Results</h3>", unsafe_allow_html=True)
-            st.dataframe(results_df.style.set_table_attributes('style="margin:auto; width:80%;"'))
+            # Define CSS to center-align the table
+                        # Create an HTML table from the DataFrame
+            table_html = results_df.to_html(index=False)
+
+            # Center-align the table using a styled div
+            centered_table_html = f"""
+            <div style="display: flex; justify-content: center;">
+                {table_html}
+            </div>
+            """
+
+            # Render the centered table in Streamlit
+            st.markdown(centered_table_html, unsafe_allow_html=True)
+            
+            # st.dataframe(results_df.style.set_table_attributes('style="margin:auto; width:80%; text-align: center; margin-left: auto;margin-right: auto;"'))
 
             # Animate the images side by side
             st.markdown("<h3 style='text-align: center;'>Image Processing Steps</h3>", unsafe_allow_html=True)
+            # st.markdown(f"<h3 style='text-align: center;'>{l}, {a}, {b}</h3>", unsafe_allow_html=True)
             
             # Create placeholders for extracted and processed images
             static_placeholder = st.empty()
             
             caption1 = ['Orginial Image', 'Greyscale Image', 'Triangular Thresholding', 'Morphological Opening', 'Morphological Closing', 'Extracted Regions']
-            caption2 = [f'ROI {i+1}' for i in range(0, len(rgb_values))]
+            caption2 = [f'ROI {i+1}' for i in range(0, n)]
             caption3 = ['L Channel', 'a Channel', 'b Channel']
             
             captions = caption1 + caption2 + caption3
             
-            zip_data = zip_images_and_dataframe('output', df)
+            zip_data = zip_images_and_dataframe('output', results_df)
 
             st.download_button(
                 label="Download Data (ZIP)",
@@ -341,7 +384,7 @@ if __name__ == "__main__":
                 for image_path in images_to_display:
                     static_placeholder.image(image_path, caption=captions[count], use_column_width=True)
                     count+=1# Display the current extracted image
-                    time.sleep(3)  # Wait for 1 second before displaying the next image
+                    time.sleep(2)  # Wait for 1 second before displaying the next image
                 
 
 
@@ -380,7 +423,7 @@ if __name__ == "__main__":
             selected_params[option] = st.checkbox(option, value=define_all)
         
         # Centered button to open Google
-        st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Take Reference Image</button></a></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'><a href='http://192.168.253.102/' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Take Reference Image</button></a></div>", unsafe_allow_html=True)
         
         # Add a gap below the "Take Reference Image" button
         st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
@@ -394,7 +437,7 @@ if __name__ == "__main__":
             st.image(image, use_column_width=True, caption='Uploaded Reference Image', output_format='PNG')
 
             # Show the new button after the image is uploaded
-            st.markdown("<div style='text-align: center;'><a href='https://www.google.com' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Upload Image(s)</button></a></div>", unsafe_allow_html=True)
+            st.markdown("<div style='text-align: center;'><a href='http://192.168.253.102/' target='_blank' style='font-size: 18px; text-decoration: none;'><button style='padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px;'>Upload Image(s)</button></a></div>", unsafe_allow_html=True)
         
             # Add a gap below the "Take Reference Image" button
             st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)  # Adds a gap
@@ -403,8 +446,7 @@ if __name__ == "__main__":
             multiple_files = st.file_uploader("Upload Multiple Images", type=["jpg", "jpeg", "png"], label_visibility="collapsed", accept_multiple_files=True)
             
             # Process the uploaded Reference image and get RGB, LAB values, and image paths
-            r_rgb_values, r_lab_values, r_centroids, r_diameters, r_perimeters, r_areas, r_bi, r_images_to_display = process_image(image)
-            
+            r_avg_r, r_avg_g, r_avg_b, r_avg_l, r_avg_a, r_avg_b, r_avg_area, r_avg_perimeter, r_avg_diameter, r_avg_bi, r_avg_c_x, r_avg_c_y, n, r_images_to_display = process_image(image)
                 
             # Function to process multiple images and display results in a table
             def process_images(images):
@@ -412,40 +454,38 @@ if __name__ == "__main__":
                 
                 for idx, image_file in enumerate(images):
                     image = Image.open(image_file)
-                    rgb_values, lab_values, centroids, diameters, perimeters, areas, bi, _ = process_image(image)
+                    avg_r, avg_g, avg_b, avg_l, avg_a, avg_b, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_c_x, avg_c_y, _, _ = process_image(image)
 
                     if (idx==0):
                         image_label = 'Reference'
                     else:
                         image_label = f"Image {idx}"  # Sequential naming for images
                     
-                    for i in range(len(rgb_values)):
-                        row = {}
-                        row['Image No.'] = image_label
-                        row['Blob'] = f'{i + 1}'
-                        if selected_params.get("RGB"):
-                            row['R'] = rgb_values[i][0]
-                            row['G'] = rgb_values[i][1]
-                            row['B'] = rgb_values[i][2]
-                        if selected_params.get("L* a* b*"):
-                            row['L*'] = lab_values[i][0]
-                            row['a*'] = lab_values[i][1]
-                            row['b*'] = lab_values[i][2]
-                        if selected_params.get("Browning Index"):
-                            row['BI'] = bi[i]
-                        if selected_params.get("Centroid"):
-                            row['x'] = int(round(centroids[i][1]))
-                            row['y'] = int(round(centroids[i][0]))
-                        if selected_params.get("Equivalent Diameter"):
-                            row['Equivalent Diameter'] = diameters[i]
-                        if selected_params.get("Perimeter"):
-                            row['Perimeter'] = perimeters[i]
-                        if selected_params.get("Area"):
-                            row['Area'] = areas[i]
-                        if selected_params.get("∆E"):
-                            row['∆E'] = round(np.sqrt((r_lab_values[i][0] - lab_values[i][0]) ** 2 + (r_lab_values[i][1] - lab_values[i][1]) ** 2 + (r_lab_values[i][2] - lab_values[i][2]) ** 2))
+                    row = {}
+                    row['Image No.'] = image_label
+                    if selected_params.get("RGB"):
+                        row['R'] = avg_r
+                        row['G'] = avg_g
+                        row['B'] = avg_b
+                    if selected_params.get("L* a* b*"):
+                        row['L*'] = avg_l
+                        row['a*'] = avg_a
+                        row['b*'] = avg_b
+                    if selected_params.get("Browning Index"):
+                        row['BI'] = avg_bi
+                    if selected_params.get("Centroid"):
+                        row['x'] = avg_c_x
+                        row['y'] = avg_c_y
+                    if selected_params.get("Equivalent Diameter"):
+                        row['Equivalent Diameter'] = avg_diameter
+                    if selected_params.get("Perimeter"):
+                        row['Perimeter'] = avg_perimeter
+                    if selected_params.get("Area"):
+                        row['Area'] = avg_area
+                    if selected_params.get("∆E"):
+                        row['∆E'] = round(np.sqrt((r_avg_l - avg_l)**2 + (r_avg_a - avg_a)**2 + (r_avg_b - avg_b)**2), 2)
                             
-                        data.append(row)
+                    data.append(row)
                 
                 return pd.DataFrame(data)
 
@@ -480,8 +520,7 @@ if __name__ == "__main__":
                 
                 
                 # Group by 'Image' and calculate the mean for each group
-                results_df_avg = results_df.groupby('Image No.').mean()
-                
+                results_df_avg = results_df.groupby('Image No.').mean(numeric_only=True).round()
                 
                 # Reset the index (optional, but makes the DataFrame cleaner)
                 results_df_avg = results_df_avg.reset_index()
@@ -540,7 +579,7 @@ if __name__ == "__main__":
                 
                 # Display the results in a table
                 st.markdown("<h2 style='text-align: center;'>Results</h2>", unsafe_allow_html=True)
-                st.dataframe(df)
+                st.dataframe(results_df_avg)
                 
                 # Animate the images side by side
                 st.markdown("<h3 style='text-align: center;'>Image Processing Steps</h3>", unsafe_allow_html=True)
@@ -549,7 +588,7 @@ if __name__ == "__main__":
                 dynamic_placeholder = st.empty()
                 
                 caption1 = ['Orginial Image', 'Greyscale Image', 'Triangular Thresholding', 'Morphological Opening', 'Morphological Closing', 'Extracted Regions']
-                caption2 = [f'ROI {i+1}' for i in range(0, len(r_lab_values))]
+                caption2 = [f'ROI {i+1}' for i in range(0, n)]
                 caption3 = ['L Channel', 'a Channel', 'b Channel']
                 
                 captions = caption1 + caption2 + caption3
@@ -586,4 +625,4 @@ if __name__ == "__main__":
                     for image_path in r_images_to_display:
                         dynamic_placeholder.image(image_path, caption=captions[count], use_column_width=True)
                         count+=1# Display the current extracted image
-                        time.sleep(3)  # Wait for 1 second before displaying the next image
+                        time.sleep(2)  # Wait for 1 second before displaying the next image
