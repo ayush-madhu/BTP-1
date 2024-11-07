@@ -169,19 +169,19 @@ def process_images(image, threshold_value, idx):
     avg_roundness = np.round(np.mean([4 * np.pi * area / (perimeter**2) for area, perimeter in zip(roi_area, roi_perimeter)]),2)
         
     if (idx == 0):
-        temp_image = os.path.join(output_dir, 'Reference Image')
+        temp_image = os.path.join(output_dir, 'Reference_Image')
     else:
-        temp_image = os.path.join(output_dir, f'Image {idx}')
+        temp_image = os.path.join(output_dir, f'Image_{idx}')
     
     #filenames
-    grayscale_path = os.path.join(temp_image, f'grayscale_image{idx}.jpg')
-    threshold_path = os.path.join(temp_image, f'threshold_image{idx}.jpg')
-    opening_path = os.path.join(temp_image, f'opening{idx}.jpg')
-    closing_path = os.path.join(temp_image, f'closing{idx}.jpg')
-    extraction_path = os.path.join(temp_image, f'extraction{idx}.jpg')
-    L_path = os.path.join(temp_image, f'L_image{idx}.jpg')
-    a_path = os.path.join(temp_image, f'a_image{idx}.jpg')
-    b_path = os.path.join(temp_image, f'b_image{idx}.jpg')
+    grayscale_path = os.path.join(temp_image, f'grayscale_image_{idx}.jpg')
+    threshold_path = os.path.join(temp_image, f'threshold_image_{idx}.jpg')
+    opening_path = os.path.join(temp_image, f'opening_{idx}.jpg')
+    closing_path = os.path.join(temp_image, f'closing_{idx}.jpg')
+    extraction_path = os.path.join(temp_image, f'extraction_{idx}.jpg')
+    L_path = os.path.join(temp_image, f'L_image_{idx}.jpg')
+    a_path = os.path.join(temp_image, f'a_image_{idx}.jpg')
+    b_path = os.path.join(temp_image, f'b_image_{idx}.jpg')
     
     #Saving the files
     # Check if the directory exists and is not empty
@@ -200,7 +200,7 @@ def process_images(image, threshold_value, idx):
     cv2.imwrite(b_path, b_normalized)
     
     if (idx == 0):
-        original_image_path = os.path.join(temp_image, f'Reference Image.jpg')
+        original_image_path = os.path.join(temp_image, 'Reference_Image.jpg')
         cv2.imwrite(original_image_path, image_bgr)
         images_to_display = [original_image_path, grayscale_path, threshold_path, opening_path, closing_path, extraction_path]
         for i in roi_images_to_display:
