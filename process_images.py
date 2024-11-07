@@ -169,7 +169,7 @@ def process_images(image, threshold_value, idx):
     avg_roundness = np.round(np.mean([4 * np.pi * area / (perimeter**2) for area, perimeter in zip(roi_area, roi_perimeter)]),2)
         
     if (idx == 0):
-        temp_image = os.path.join(output_dir, f'Reference Image')
+        temp_image = os.path.join(output_dir, 'Reference Image')
     else:
         temp_image = os.path.join(output_dir, f'Image {idx}')
     
@@ -185,10 +185,11 @@ def process_images(image, threshold_value, idx):
     
     #Saving the files
     # Check if the directory exists and is not empty
-    if os.path.exists(temp_image):
+    if os.path.exists(temp_image) and idx==0:
         # Remove the existing directory and all of its contents
         shutil.rmtree(temp_image)
-    os.makedirs(temp_image)
+    if not (os.path.exists(temp_image)):
+        os.makedirs(temp_image)
     cv2.imwrite(grayscale_path, image_gray)
     cv2.imwrite(threshold_path, triangle)
     cv2.imwrite(opening_path, opening)
