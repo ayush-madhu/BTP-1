@@ -2,22 +2,19 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-import pandas as pd
-from dynamic_mode import *
-from image_processing import *
 from process_images import *
 
 
-def sorting_images(thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, image_infos):
+def sorting_images(thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_elongation, avg_chroma, avg_hue, avg_roundness, image_infos):
     
     # Choose the list to sort by (e.g., list1)
-    combined = list(zip(image_infos, thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi))
+    combined = list(zip(image_infos, thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_elongation, avg_chroma, avg_hue, avg_roundness))
 
     # Sort the combined list by the first element of each tuple (list1)
     sorted_combined = sorted(combined, key=lambda x: x[0])
 
     # Unzip the sorted lists back
-    image_infos, thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi = zip(*sorted_combined)
+    image_infos, thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_elongation, avg_chroma, avg_hue, avg_roundness = zip(*sorted_combined)
 
     # Convert back to lists if needed
     image_infos = list(image_infos)
@@ -33,8 +30,12 @@ def sorting_images(thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, 
     avg_perimeter = list(avg_perimeter)
     avg_diameter = list(avg_diameter)
     avg_bi = list(avg_bi)
+    avg_elongation = list(avg_elongation)
+    avg_chroma = list(avg_chroma)
+    avg_hue = list(avg_hue)
+    avg_roundness = list(avg_roundness)
     
-    return thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, image_infos
+    return thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_elongation, avg_chroma, avg_hue, avg_roundness, image_infos
 
 def sliders(uploaded_files):
 
@@ -60,20 +61,27 @@ def sliders(uploaded_files):
         avg_perimeter = []
         avg_diameter = []
         avg_bi = []
+        avg_chroma = []
+        avg_hue = []
+        avg_roundness = []
         image_infos = []
+        avg_elongation = []
 
         # Step 2: Loop through the uploaded images and apply Otsu's thresholding
         for idx, uploaded_file in enumerate(uploaded_files):
             image = Image.open(uploaded_file)
             image_np = np.array(image)
-            image_name = f"Image {idx+1}: {uploaded_file.name}"
+            if (idx == 0):
+                # image_name = f"Reference Image: {uploaded_file.name}"
+                image_name = f"Reference Image"
+            else:
+                # image_name = f"Image {idx}: {uploaded_file.name}"
+                image_name = f"Image {idx}"
             image_info = int(uploaded_file.name.split(".")[0])
 
             # Convert to grayscale if the image is in color
-            if image_np.ndim == 3:
-                grayscale_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
-            else:
-                grayscale_image = image_np  # if already grayscale
+            grayscale_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+
 
             # Apply Triangle's thresholding as the initial threshold
             triangle_threshold_value, _ = cv2.threshold(grayscale_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_TRIANGLE)
@@ -87,7 +95,7 @@ def sliders(uploaded_files):
                 f"Adjust Threshold for {image_name}",
                 min_value=0,
                 max_value=255,
-                value=int(triangle_threshold_value),  # Default to Otsu's threshold
+                value=int(triangle_threshold_value),
                 key=image_name
             )
 
@@ -103,7 +111,10 @@ def sliders(uploaded_files):
             # Add to the list of images to save
             thresholded_images.append((thresholded_image, uploaded_file.name, threshold_value))
             
-            r, g, b, l, a, bb, area, perimeter, diameter, bi, _ = process_images(image, threshold_value, idx+1)
+            if (idx == 0):
+                r, g, b, l, a, bb, area, perimeter, diameter, bi, elongation, chroma, hue, roundness, n, images_to_display = process_images(image, threshold_value, idx)
+            else:
+                r, g, b, l, a, bb, area, perimeter, diameter, bi, elongation, chroma, hue, roundness, _ = process_images(image, threshold_value, idx)
             
             image_names.append(image_name)
             avg_r.append(r)
@@ -116,8 +127,12 @@ def sliders(uploaded_files):
             avg_perimeter.append(perimeter)
             avg_diameter.append(diameter)
             avg_bi.append(bi)
+            avg_elongation.append(elongation)
+            avg_chroma.append(chroma)
+            avg_hue.append(hue)
+            avg_roundness.append(roundness)
             image_infos.append(image_info)
         
-        thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, image_infos = sorting_images(thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, image_infos)
+        thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_elongation, avg_chroma, avg_hue, avg_roundness, image_infos = sorting_images(thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_elongation, avg_chroma, avg_hue, avg_roundness, image_infos)
             
-    return thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, image_infos
+    return thresholded_images, image_names, avg_r, avg_g, avg_b, avg_l, avg_a, avg_bb, avg_area, avg_perimeter, avg_diameter, avg_bi, avg_elongation, avg_chroma, avg_hue, avg_roundness, image_infos, n, images_to_display
