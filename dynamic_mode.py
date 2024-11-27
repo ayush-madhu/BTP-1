@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
 import time
-from util import zip_images_and_dataframe
+from util import create_zip
 import numpy as np
 import matplotlib.pyplot as plt
-from slider import sliders
-from process_images import clear_output_directory
+from image_processing import process_images, clear_output_directory
+import io
 
 # Function to calculate the time difference in seconds between two timestamps (t1 and t2) in the format 'YYYYMMDDHHMMSS' (e.g., '20220101120000') and return the difference in seconds as an integer
 def time_difference_in_seconds(t1, t2):
@@ -40,6 +40,7 @@ def dynamic_mode():
         "Area",
         "Roundness",
         "Elongation",
+        "Shrinkage"
     ]
 
     define_all = st.checkbox("Select All")
@@ -68,6 +69,7 @@ def dynamic_mode():
     # Check if the user has uploaded multiple images and display the sliders for setting the threshold values for each image
     if multiple_files:
         clear_output_directory()
+        
         (
             image_names,
             avg_r,
@@ -84,10 +86,10 @@ def dynamic_mode():
             avg_chroma,
             avg_hue,
             avg_roundness,
+            threshold_values,
             image_infos,
-            n,
             images_to_display,
-        ) = sliders(multiple_files)
+        ) = process_images(multiple_files)
         
         if st.button("Done"):
             reference = str(image_infos[0])
@@ -126,6 +128,10 @@ def dynamic_mode():
                 avg_a = avg_a.tolist()
                 avg_bb = avg_bb.tolist()
                 check = 1
+            if selected_params.get("Shrinkage"):
+                row["Shrinkage"] = [(avg_area[0] - x) / avg_area[0] for x in avg_area]
+                row["Shrinkage"] = [round(x, 2) for x in row["Shrinkage"]]
+
             if selected_params.get("Chroma"):
                 row["Chroma"] = avg_chroma
             if selected_params.get("Hue Angle"):
@@ -144,13 +150,16 @@ def dynamic_mode():
                 row["BI"] = avg_bi
                 check = 1
 
+            row["Threshold Values"] = threshold_values
             results_df_avg = pd.DataFrame(row)
 
             # Plot the selected parameters based on the time differences between the images (in hours) using matplotlib and save the plots as images in the 'output' folder for display
             
+            figures = []
+            
             if selected_params.get("Browning Index"):
-                plt.figure()
-                plt.plot(
+                fig, ax = plt.subplots()
+                ax.plot(
                     time_differences,
                     results_df_avg["BI"],
                     marker="o",
@@ -158,15 +167,15 @@ def dynamic_mode():
                     color="blue",
                     label="Browning Index",
                 )
-                plt.title("Browning Index Plot")
-                plt.xlabel("Time (hours)")
-                plt.ylabel("Average BI")
-                plt.legend(loc="upper right")
-                plt.savefig("output/bi_plot.png")
-
+                ax.set_title("Browning Index Plot")
+                ax.set_xlabel("Time (hours)")
+                ax.set_ylabel("Average BI")
+                ax.legend(loc="upper right")
+                figures.append(fig)
+                
             if selected_params.get("L* a* b*"):
-                plt.figure()
-                plt.plot(
+                fig, ax = plt.subplots()
+                ax.plot(
                     time_differences,
                     results_df_avg["L*"],
                     marker="o",
@@ -174,7 +183,7 @@ def dynamic_mode():
                     color="blue",
                     label="L*",
                 )
-                plt.plot(
+                ax.plot(
                     time_differences,
                     results_df_avg["a*"],
                     marker="^",
@@ -182,7 +191,7 @@ def dynamic_mode():
                     color="red",
                     label="a*",
                 )
-                plt.plot(
+                ax.plot(
                     time_differences,
                     results_df_avg["b*"],
                     marker="d",
@@ -190,15 +199,15 @@ def dynamic_mode():
                     color="green",
                     label="b*",
                 )
-                plt.title("L*a*b* Colour")
-                plt.xlabel("Time, hours")
-                plt.ylabel("Average Color")
-                plt.legend(loc="upper right")
-                plt.savefig("output/lab_plot.png")
+                ax.set_title("L*a*b* Colour")
+                ax.set_xlabel("Time, hours")
+                ax.set_ylabel("Average Color")
+                ax.legend(loc="upper right")
+                figures.append(fig)
 
             if selected_params.get("∆E"):
-                plt.figure()
-                plt.plot(
+                fig, ax = plt.subplots()
+                ax.plot(
                     time_differences,
                     results_df_avg["∆E"],
                     marker="o",
@@ -206,11 +215,12 @@ def dynamic_mode():
                     color="blue",
                     label="∆E",
                 )
-                plt.title("∆E")
-                plt.xlabel("Time, hours")
-                plt.ylabel("Colour Difference (∆E)")
-                plt.legend(loc="upper right")
-                plt.savefig("output/dele_plot.png")
+                ax.set_title("∆E")
+                ax.set_xlabel("Time, hours")
+                ax.set_ylabel("Colour Difference (∆E)")
+                ax.legend(loc="upper right")
+                figures.append(fig)
+                
 
             # Add heading for the image processing steps section
             st.markdown(
@@ -222,20 +232,17 @@ def dynamic_mode():
             dynamic_placeholder = st.empty()
 
             # Define the captions for the images to be displayed in the placeholders based on the image processing steps
-            caption1 = [
+            captions = [
                 "Orginial Image",
                 "Greyscale Image",
                 "Triangular Thresholding",
                 "Morphological Opening",
                 "Morphological Closing",
-                "Extracted Regions",
+                "Extracted ROI",
+                "L Channel", 
+                "a Channel", 
+                "b Channel"                
             ]
-            caption2 = [f"ROI {i+1}" for i in range(0, n)]
-            caption3 = ["L Channel", "a Channel", "b Channel"]
-
-            # Combine the captions for all the images
-            captions = caption1 + caption2 + caption3
-
             # Display the results in a table format
             st.markdown(
                 "<h2 style='text-align: center;'>Results</h2>", unsafe_allow_html=True
@@ -251,31 +258,37 @@ def dynamic_mode():
 
             if selected_params.get("Browning Index"):
                 graph1_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[0].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
                 graph1_placeholder.image(
-                    "output/bi_plot.png",
+                    img_buffer,
                     caption="Browning Index Plot",
                     use_column_width=True,
                 )
             if selected_params.get("L* a* b*"):
                 graph2_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[1].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
                 graph2_placeholder.image(
-                    "output/lab_plot.png", caption="L*a*b* Plot", use_column_width=True
+                    img_buffer, caption="L*a*b* Plot", use_column_width=True
                 )
             if selected_params.get("∆E"):
                 graph3_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[2].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
                 graph3_placeholder.image(
-                    "output/dele_plot.png", caption="Del E Plot", use_column_width=True
+                    img_buffer, caption="∆E Plot", use_column_width=True
                 )
-
-            # Download the data as a ZIP file containing the images and the results dataframe
-            image_folder = "output"
-            zip_data = zip_images_and_dataframe(image_folder, results_df_avg)
-
+            
+            zip_file = create_zip(images_to_display, figures, results_df_avg)
             st.download_button(
-                label="Download Data (ZIP)",
-                data=zip_data,
-                file_name="Dynamic Data.zip",
-                mime="application/zip",
+                label="Download ZIP",
+                data=zip_file.getvalue(),
+                file_name="output.zip",
+                mime="application/zip"
             )
 
             # Image Prcoessing Steps Display Loop for Dynamic Mode
