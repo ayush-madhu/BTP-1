@@ -204,13 +204,13 @@ def calculate_roi_properties(roi, contour):
         masked_roi = cv2.bitwise_and(roi, roi, mask=mask)
         
         # Calculate Area
-        area = np.sum(mask == 255)  # The area is the number of white pixels in the mask
+        area = np.round(np.sum(mask == 255))  # The area is the number of white pixels in the mask
 
         # Calculate Perimeter using the contour
-        perimeter = cv2.arcLength(contour, True)
+        perimeter = np.round(cv2.arcLength(contour, True),2)
 
         # Calculate Equivalent Diameter
-        equivalent_diameter = np.sqrt(4 * area / np.pi)
+        equivalent_diameter = np.round((np.sqrt(4 * area / np.pi)),2)
 
         # Calculate Minimum Length and Maximum Length using bounding box
         rect = cv2.minAreaRect(contour)
@@ -218,7 +218,7 @@ def calculate_roi_properties(roi, contour):
         min_length = min(w, h)
         max_length = max(w, h)
         
-        elongation = max_length / min_length if min_length > 0 else 0
+        elongation = np.round(max_length / min_length,2) if min_length > 0 else 0
 
         # Calculate RGB average of the ROI inside the contour
         avg_rgb = np.mean(masked_roi[mask == 255], axis=0).astype(int)  # Average only inside the contour
@@ -227,7 +227,7 @@ def calculate_roi_properties(roi, contour):
         l, a, bb = rgb_to_lab(r, g, b)
                 
         k = (a + (1.75 * l)) / ((5.645 * l) + a - (0.3012 * bb))
-        bi = (100 * (k - 0.31)) / 0.17
+        bi = np.round((100 * (k - 0.31)) / 0.17, 2)
         
         chroma = np.round(np.sqrt(l**2 + a**2 + bb**2), 2)
         hue = np.round(np.degrees(np.arctan2(bb, a)), 2)
@@ -290,7 +290,8 @@ def process_images(uploaded_files):
         rois_with_padding = add_padding_to_rois(rois, padding=10)
 
         # Morphological opening and closing images
-        morph_open = cv2.morphologyEx(processed_thresh, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+        _, raw_threshold = cv2.threshold(gray_image, threshold, 255, cv2.THRESH_BINARY_INV)
+        morph_open = cv2.morphologyEx(raw_threshold, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
         morph_close = cv2.morphologyEx(morph_open, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
         
         # Append morphological opened and closed images to the list
@@ -339,7 +340,7 @@ def process_images(uploaded_files):
                 if (idx==0):
                     images_to_display.append(image)
                     images_to_display.append(gray_image)
-                    images_to_display.append(processed_thresh)
+                    images_to_display.append(raw_threshold)
                     images_to_display.append(morph_open)
                     images_to_display.append(morph_close)
                     images_to_display.append(extracted_roi)

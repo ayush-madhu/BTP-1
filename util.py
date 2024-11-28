@@ -23,7 +23,16 @@ def create_zip(images, graphs, dataframe):
             img_buffer = BytesIO()
             img.save(img_buffer, format="PNG")
             img_buffer.seek(0)
-            zf.writestr(f"Images/image_{idx + 1}.png", img_buffer.getvalue())
+            image_captions = ["Orginial Image",
+                "Greyscale Image",
+                "Triangular Thresholding",
+                "Morphological Opening",
+                "Morphological Closing",
+                "Extracted ROI",
+                "L Channel",
+                "a Channel",
+                "b Channel"]
+            zf.writestr(f"Images/{idx+1}. {image_captions[idx]}.png", img_buffer.getvalue())
 
         # Add graphs to the "Graphs/" folder
         for idx, graph in enumerate(graphs):

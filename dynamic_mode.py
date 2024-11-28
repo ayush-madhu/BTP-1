@@ -35,11 +35,11 @@ def dynamic_mode():
         "Browning Index",
         "Chroma",
         "Hue Angle",
+        "Roundness",
+        "Elongation",
         "Equivalent Diameter",
         "Perimeter",
         "Area",
-        "Roundness",
-        "Elongation",
         "Shrinkage"
     ]
 
@@ -52,9 +52,9 @@ def dynamic_mode():
     for option in parameters:
         if option == "RGB":
             st.write("Colour Parameters")
-        elif option == "Equivalent Diameter":
-            st.write("Shape Parameters")
         elif option == "Roundness":
+            st.write("Shape Parameters")
+        elif option == "Equivalent Diameter":
             st.write("Size Parameters")
         selected_params[option] = st.checkbox(option, value=define_all)
 
@@ -101,6 +101,7 @@ def dynamic_mode():
             check = 0
             row = {}
             row["Image No."] = image_names
+            row["Threshold Values"] = threshold_values
             if selected_params.get("RGB"):
                 row["R"] = avg_r
                 row["G"] = avg_g
@@ -109,6 +110,9 @@ def dynamic_mode():
                 row["L*"] = avg_l
                 row["a*"] = avg_a
                 row["b*"] = avg_bb
+                check = 1
+            if selected_params.get("Browning Index"):
+                row["BI"] = avg_bi
                 check = 1
             if selected_params.get("∆E"):
                 avg_l = np.array(avg_l)
@@ -128,29 +132,24 @@ def dynamic_mode():
                 avg_a = avg_a.tolist()
                 avg_bb = avg_bb.tolist()
                 check = 1
-            if selected_params.get("Shrinkage"):
-                row["Shrinkage"] = [(avg_area[0] - x) / avg_area[0] for x in avg_area]
-                row["Shrinkage"] = [round(x, 2) for x in row["Shrinkage"]]
-
             if selected_params.get("Chroma"):
                 row["Chroma"] = avg_chroma
             if selected_params.get("Hue Angle"):
                 row["Hue Angle"] = avg_hue
+            if selected_params.get("Roundness"):
+                row["Roundness"] = avg_roundness
+            if selected_params.get("Elongation"):
+                row["Elongation"] = avg_elongation
             if selected_params.get("Equivalent Diameter"):
                 row["Equivalent Diameter"] = avg_diameter
             if selected_params.get("Perimeter"):
                 row["Perimeter"] = avg_perimeter
             if selected_params.get("Area"):
                 row["Area"] = avg_area
-            if selected_params.get("Roundness"):
-                row["Roundness"] = avg_roundness
-            if selected_params.get("Elongation"):
-                row["Elongation"] = avg_elongation
-            if selected_params.get("Browning Index"):
-                row["BI"] = avg_bi
-                check = 1
-
-            row["Threshold Values"] = threshold_values
+            if selected_params.get("Shrinkage"):
+                row["Shrinkage"] = [((avg_area[0] - x) / avg_area[0])*100 for x in avg_area]
+                row["Shrinkage"] = [round(x, 2) for x in row["Shrinkage"]]
+            
             results_df_avg = pd.DataFrame(row)
 
             # Plot the selected parameters based on the time differences between the images (in hours) using matplotlib and save the plots as images in the 'output' folder for display
@@ -220,6 +219,98 @@ def dynamic_mode():
                 ax.set_ylabel("Colour Difference (∆E)")
                 ax.legend(loc="upper right")
                 figures.append(fig)
+            
+            avg_area = np.array(avg_area)
+            area_diff = (avg_area[0]-avg_area).tolist()
+            if selected_params.get("Area"):
+                fig, ax = plt.subplots()
+                ax.plot(
+                    time_differences,
+                    area_diff,
+                    marker="o",
+                    markersize=5,
+                    color="blue",
+                    label="Area",
+                )
+                ax.set_title("Area")
+                ax.set_xlabel("Time, hours")
+                ax.set_ylabel("Change in Area")
+                ax.legend(loc="upper right")
+                figures.append(fig)
+            
+            avg_roundness = np.array(avg_roundness)
+            roundness_diff = (avg_roundness[0]-avg_roundness).tolist()
+            if selected_params.get("Roundness"):
+                fig, ax = plt.subplots()
+                ax.plot(
+                    time_differences,
+                    roundness_diff,
+                    marker="o",
+                    markersize=5,
+                    color="blue",
+                    label="Roundness",
+                )
+                ax.set_title("Roundness")
+                ax.set_xlabel("Time, hours")
+                ax.set_ylabel("Change in Roundness")
+                ax.legend(loc="upper right")
+                figures.append(fig)
+                
+            avg_elongation = np.array(avg_elongation)
+            elongation_diff = (avg_elongation[0]-avg_elongation).tolist()
+            if selected_params.get("Roundness"):
+                fig, ax = plt.subplots()
+                ax.plot(
+                    time_differences,
+                    elongation_diff,
+                    marker="o",
+                    markersize=5,
+                    color="blue",
+                    label="Elongation",
+                )
+                ax.set_title("Elongation")
+                ax.set_xlabel("Time, hours")
+                ax.set_ylabel("Change in Elongation")
+                ax.legend(loc="upper right")
+                figures.append(fig)
+            
+            avg_perimeter = np.array(avg_perimeter)   
+            perimeter_diff = (avg_perimeter[0]-avg_perimeter).tolist()
+            if selected_params.get("Roundness"):
+                fig, ax = plt.subplots()
+                ax.plot(
+                    time_differences,
+                    perimeter_diff,
+                    marker="o",
+                    markersize=5,
+                    color="blue",
+                    label="Perimeter",
+                )
+                ax.set_title("Perimeter")
+                ax.set_xlabel("Time, hours")
+                ax.set_ylabel("Change in Perimeter")
+                ax.legend(loc="upper right")
+                figures.append(fig)
+                
+            shrinkage = ((avg_area[0]-avg_area)/avg_area[0]).tolist()  
+            shrinkage = np.array(shrinkage)              
+            shrinkage_diff = (np.round(shrinkage[0]-shrinkage,2)).tolist()
+            if selected_params.get("Shrinkage"):
+                fig, ax = plt.subplots()
+                ax.plot(
+                    time_differences,
+                    shrinkage_diff,
+                    marker="o",
+                    markersize=5,
+                    color="blue",
+                    label="Shrinkage",
+                )
+                ax.set_title("Shrinkage")
+                ax.set_xlabel("Time, hours")
+                ax.set_ylabel("Change in Shrinkage")
+                ax.legend(loc="upper right")
+                figures.append(fig)
+                
                 
 
             # Add heading for the image processing steps section
@@ -281,6 +372,51 @@ def dynamic_mode():
                 img_buffer.seek(0)
                 graph3_placeholder.image(
                     img_buffer, caption="∆E Plot", use_column_width=True
+                )
+                
+            if selected_params.get("Area"):
+                graph3_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[3].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
+                graph3_placeholder.image(
+                    img_buffer, caption="∆Area Plot", use_column_width=True
+                )
+                
+            if selected_params.get("Roundness"):
+                graph3_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[4].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
+                graph3_placeholder.image(
+                    img_buffer, caption="∆Roundness Plot", use_column_width=True
+                )
+                
+            if selected_params.get("Elongation"):
+                graph3_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[5].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
+                graph3_placeholder.image(
+                    img_buffer, caption="∆Elongation Plot", use_column_width=True
+                )
+                
+            if selected_params.get("Perimeter"):
+                graph3_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[6].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
+                graph3_placeholder.image(
+                    img_buffer, caption="∆Perimeter Plot", use_column_width=True
+                )
+                
+            if selected_params.get("Shrinkage"):
+                graph3_placeholder = st.empty()
+                img_buffer = io.BytesIO()
+                figures[7].savefig(img_buffer, format="PNG")  # Save the figure as PNG into the buffer
+                img_buffer.seek(0)
+                graph3_placeholder.image(
+                    img_buffer, caption="∆Shrinkage Plot", use_column_width=True
                 )
             
             zip_file = create_zip(images_to_display, figures, results_df_avg)
